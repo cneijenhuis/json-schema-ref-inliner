@@ -15,15 +15,34 @@ object RefInliner extends App {
   val baseUrl = "http://localhost:8080/sphere/schemas/"
   //val schemaUrl = baseUrl + "categories.schema.json"
   val schemaUrl = baseUrl + "customers.schema.json"
-  val h: Http = new Http(new AsyncHttpClient)
 
-  val base = resp(schemaUrl)
-  Await.result(base flatMap { r => inline(parse(r.getResponseBody)) } map { json => println(pretty(render(json))) }, 2 seconds)
-  h.shutdown()
+  def splitBaseUrlAndSchema(str: String): (String, String) = {
+    val i = str.lastIndexOf("/")
+    if (i < 1) throw new IllegalArgumentException("Not a valid url")
+    str.splitAt(i + 1)
+  }
 
-  def resp(schemaUrl: String) = h(url(schemaUrl).GET)
+  override def main(args: Array[String]): Unit = {
+    val (base, schema) = if (args.size > 0) splitBaseUrlAndSchema(args(0)) else (baseUrl, schemaUrl)
+    val inliner = new RefInliner(base, schema)
+    val result = Await.result(inliner.inlineRefs(), 5 seconds)
+    println(pretty(render(result)))
+  }
+}
 
-  def inline(json: JValue) = { 
+class RefInliner(baseUrl: String, schema: String) {
+  lazy val h: Http = new Http(new AsyncHttpClient)
+
+  def inlineRefs() = {
+    val orig = resp(baseUrl + schema)
+    val result = orig flatMap { r => inline(parse(r.getResponseBody)) }
+    result map { w => h.shutdown() }
+    result
+  }
+
+  private def resp(schemaUrl: String) = h(url(schemaUrl).GET)
+
+  private def inline(json: JValue) = { 
     val raj = refsAndJsons(references(json))  
     raj map {
       rj => json.transform {
@@ -31,7 +50,7 @@ object RefInliner extends App {
     } }
   }
 
-  def refsAndJsons(refs: Set[String]): Future[Map[String, JValue]] = {
+  private def refsAndJsons(refs: Set[String]): Future[Map[String, JValue]] = {
     val refsWithResp = refs map { ref =>
       resp(baseUrl + ref) flatMap { r =>
         inline(removeSchema(parse(r.getResponseBody))) map { json: JValue => (ref, json) } 
@@ -39,7 +58,7 @@ object RefInliner extends App {
     Future.sequence(refsWithResp) map(set => set.toMap)
   }
 
-  def references(json: JValue) =
+  private def references(json: JValue) =
     json filterField {
       case JField("$ref", _) => true
       case _ => false
@@ -48,7 +67,7 @@ object RefInliner extends App {
       case _ => List()
     } toSet
 
-  def removeSchema(p: JValue) =
+  private def removeSchema(p: JValue) =
     p.removeField { f => f match {
       case JField("$schema", _) => true
       case _ => false
