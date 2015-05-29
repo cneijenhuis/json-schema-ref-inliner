@@ -14,7 +14,7 @@ import dispatch._
 import org.json4s._
 import org.json4s.native.JsonMethods._
 
-object RefInliner extends App {
+object RefInliner {
   val baseUrl = "http://localhost:8080/sphere/schemas/"
   //val schemaUrl = baseUrl + "categories.schema.json"
   val schemaUrl = baseUrl + "customers.schema.json"
@@ -25,7 +25,7 @@ object RefInliner extends App {
     str.splitAt(i + 1)
   }
 
-  override def main(args: Array[String]): Unit = {
+  def main(args: Array[String]): Unit = {
     val (base, schema) = if (args.size > 0) splitBaseUrlAndSchema(args(0)) else (baseUrl, schemaUrl)
     val inliner = new RefInliner(base, schema)
     val result = Await.result(inliner.inlineRefs(), 5 seconds)
