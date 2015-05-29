@@ -1,3 +1,6 @@
+import java.nio.charset.StandardCharsets
+import java.nio.file.{Paths, Files}
+
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.{Future, Await}
 import scala.concurrent.duration.Duration
@@ -26,7 +29,10 @@ object RefInliner extends App {
     val (base, schema) = if (args.size > 0) splitBaseUrlAndSchema(args(0)) else (baseUrl, schemaUrl)
     val inliner = new RefInliner(base, schema)
     val result = Await.result(inliner.inlineRefs(), 5 seconds)
-    println(pretty(render(result)))
+
+    if (args.size > 1) {
+      Files.write(Paths.get(args(1)), pretty(render(result)).getBytes(StandardCharsets.UTF_8))
+    } else println(pretty(render(result)))
   }
 }
 
