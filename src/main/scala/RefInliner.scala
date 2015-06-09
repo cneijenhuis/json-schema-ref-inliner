@@ -83,7 +83,11 @@ class RefInliner(urlOfSchema: String) {
   private def refsAndJsons(refs: Set[String]): Future[Map[String, JValue]] = {
     val refsWithResp = refs map { ref =>
       resp(baseUrl + ref) flatMap { r =>
-        inline(removeSchema(parse(r.getResponseBody))) map { json: JValue => (ref, json) } 
+        try {
+          inline(removeSchema(parse(r.getResponseBody))) map { json: JValue => (ref, json) } 
+        } catch {
+          case e: Throwable => Future.failed(new Exception(s"Error parsing $urlOfSchema while trying to inline $ref", e))
+        }
     } }
     Future.sequence(refsWithResp) map(set => set.toMap)
   }
@@ -93,7 +97,7 @@ class RefInliner(urlOfSchema: String) {
       case JField("$ref", _) => true
       case _ => false
     } flatMap { 
-      case JField(_, JString(s: String)) => List(s)
+      case JField(_, JString(s: String)) => if (!s.startsWith("#")) List(s) else List()
       case _ => List()
     } toSet
 
