@@ -77,6 +77,11 @@ class RefInliner(urlOfSchema: String) {
     raj map {
       rj => json.transform {
         case JObject(JField("$ref", JString(s: String)) :: List()) => rj.get(s).getOrElse(JObject(List(JField("$ref", JString(s)))))
+        case JObject(JField("$ref", JString(s: String)) :: otherFields) => 
+          rj.get(s).map { j => j match { 
+            case JObject(fields) => JObject(fields ::: otherFields) 
+            case _ => j
+          } }.getOrElse(JObject(List(JField("$ref", JString(s)))))
     } }
   }
 
